@@ -8,14 +8,22 @@ import { ArrowLeftIcon } from "react-native-heroicons/solid";
 import RegisterFormUser from "@/components/login&register/RegisterFormUser";
 import RegisterFormEmail from "@/components/login&register/RegisterFormEmail";
 import { useFormContext } from "react-hook-form";
-import { RegisterUserFormData } from "@/schemas/registerUserSchema";
+import { RegisterUserFormData, RegisterUserPhotoFormData } from "@/schemas/registerUserSchema";
 import axios from 'axios';
-import { registerUser } from '@/api/registerUser';
+import { postUsuario } from '@/api/registerUser';
 
 export default function Register() {
   const colorScheme = useColorScheme();
   const router = useRouter();
-  const { trigger, getValues, reset, formState: { errors } } = useFormContext<RegisterUserFormData>();
+  const { 
+    trigger: triggerUserData,
+    getValues: getUserData,
+    reset: resetUserData } = useFormContext<RegisterUserFormData>();
+
+  const { 
+    trigger: triggerPhotoData,
+    getValues: getPhotoData,
+    reset: resetPhotoData } = useFormContext<RegisterUserPhotoFormData>();
 
   const scrollViewRef = useRef<ScrollView>(null);
   const [step, setStep] = useState(0);
@@ -54,7 +62,7 @@ export default function Register() {
     if (isLoading) return;
 
     const currentStepFields = steps[step].fields as (keyof RegisterUserFormData)[];
-    const isValid = await trigger(currentStepFields);
+    const isValid = await triggerUserData(currentStepFields);
 
     if (isValid) {
       if (step < steps.length - 1) {
@@ -65,16 +73,21 @@ export default function Register() {
         // Última etapa: Enviar para a API
         setIsLoading(true);
         try {
-          const formData = getValues();
-          const responseData = await registerUser(formData);
+          const userData = getUserData();
+          const photoData = getPhotoData();
+          
+          const responseData = await postUsuario(userData, photoData);
 
           // Se a resposta for sucesso (status 2xx)
           console.log("Cadastro realizado com sucesso!", responseData);
           router.push({
             pathname: "/user",
-            params: { email: formData.email, telefone: formData.telefone, rota: "register" },
+            params: { email: userData.email, telefone: userData.telefone, rota: "register" },
           });
-          reset(); // Limpa o formulário
+
+          // Limpa o formulário
+          resetUserData();
+          resetPhotoData();
         } catch (error: any) {
           // Loga o erro no console para depuração, independentemente do tipo.
           console.error("Falha no processo de cadastro:", error);

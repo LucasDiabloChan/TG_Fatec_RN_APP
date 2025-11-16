@@ -5,15 +5,6 @@ const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
 export const registerUserSchema = z.object({
     cpf: z.string().regex(/^\d{11}$/, "O CPF deve conter 11 dígitos").nonempty("Campo obrigatório"),
-    arquivo: z.object({
-        caminho: z.string(),
-        tipoArquivo: z.string().optional().nullable(),
-        mimeType: z.string().optional().nullable(),
-        tamanhoEmBytes: z.string().refine((size) => (size ? parseInt(size, 10) : 0) <= MAX_FILE_SIZE, `O tamanho máximo é 5MB.`),
-        bucketArquivo: z.object({
-            nome: z.string().optional().nullable(),
-        }),
-    }).optional().nullable(),
     nomeCompleto: z.string().nonempty("Campo obrigatório").refine(value => value.trim().includes(' '), {
         message: "Insira seu nome e sobrenome"
     }),
@@ -36,7 +27,7 @@ export const registerUserSchema = z.object({
         uf: z.string().nonempty("Campo obrigatório"),
         cidade: z.string().nonempty("Campo obrigatório"),
         bairro: z.string().nonempty("Campo obrigatório"),
-        rua: z.string().nonempty("Campo obrigatório"),
+        logradouro: z.string().nonempty("Campo obrigatório"),
         numero: z.string().nullable().transform((val) => val.trim() === "" ? "S/N" : val).optional(),
         complemento: z.string().max(30, "O complemento deve ter no máximo 30 caracteres").optional().nullable().transform(val => val === "" ? null : val),
     }),
@@ -50,7 +41,14 @@ export const registerUserSchema = z.object({
     }
 });
 
+export const registerPhotoUserSchema = z.object({
+    uri: z.string(),
+    type: z.string().optional().nullable(),
+    name: z.string().optional().nullable()
+}).optional().nullable()
+
 export type RegisterUserFormData = z.infer<typeof registerUserSchema>;
+export type RegisterUserPhotoFormData = z.infer<typeof registerPhotoUserSchema>;
 
 export function buildUserPayload(values: RegisterUserFormData) {
   return {
@@ -67,7 +65,7 @@ export function buildUserPayload(values: RegisterUserFormData) {
       uf: values.endereco.uf,
       cidade: values.endereco.cidade,
       bairro: values.endereco.bairro,
-      logradouro: values.endereco.rua,
+      logradouro: values.endereco.logradouro,
       numero: values.endereco.numero,
       complemento: values.endereco.complemento || null,
     }

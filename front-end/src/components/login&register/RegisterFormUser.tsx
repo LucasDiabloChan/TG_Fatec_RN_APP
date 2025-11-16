@@ -7,12 +7,13 @@ import CustomDatePicker from "../CustomDatePicker";
 import { UserIcon } from "react-native-heroicons/solid";
 import PhotoPicker from "../PhotoPicker";
 import { useCepValidation } from "@/schemas/functions/useCepValidation";
-import { RegisterUserFormData } from "@/schemas/registerUserSchema";
+import { RegisterUserFormData, RegisterUserPhotoFormData } from "@/schemas/registerUserSchema";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view"; 
 
 export default function RegisterFormUser() {
     const [modalVisible, setModalVisible] = useState<boolean>(false);
-    const { control, formState: {errors}, setValue } = useFormContext<RegisterUserFormData>();
+    const { control: controlUser, setValue: setUserValue } = useFormContext<RegisterUserFormData>();
+    const { control: controlPhoto, setValue: setPhotoValue } = useFormContext<RegisterUserPhotoFormData>();
 
     const colorScheme = useColorScheme();
     const rawCPFRef = useRef("");
@@ -21,13 +22,13 @@ export default function RegisterFormUser() {
     useEffect(() => {
         if(endereco) {
             // Usando os nomes corretos dos campos do schema de endereço
-            setValue("endereco.rua" ,endereco.logradouro);
-            setValue("endereco.bairro" ,endereco.bairro);
-            setValue("endereco.cidade" ,endereco.localidade);
-            setValue("endereco.uf" ,endereco.estado);
+            setUserValue("endereco.logradouro", endereco.logradouro);
+            setUserValue("endereco.bairro", endereco.bairro);
+            setUserValue("endereco.cidade",endereco.localidade);
+            setUserValue("endereco.uf", endereco.estado);
         }
 
-        if (error) console.log('Possível erro no CEP: '+error)
+        if (error) console.log('Possível erro no CEP: ' + error)
     }, [endereco])
 
 
@@ -42,7 +43,7 @@ export default function RegisterFormUser() {
             contentContainerClassName="pb-10 items-center gap-y-3"
         >
             <Controller 
-                control={control}
+                control={controlPhoto}
                 name="arquivo"
                 render={({field, fieldState}) => (
                     <View className="items-center w-full mb-4 gap-y-5">
@@ -63,16 +64,7 @@ export default function RegisterFormUser() {
                             onClose={() => setModalVisible(false)}
                             onChange={(asset) => {
                                 if (asset) {
-                                    const fileInfo: RegisterUserFormData["arquivo"] = {
-                                        caminho: asset.uri,
-                                        tipoArquivo: asset.mimeType,
-                                        mimeType: asset.mimeType,
-                                        tamanhoEmBytes: String(asset.fileSize),
-                                        bucketArquivo: {
-                                            nome: asset.fileName
-                                        }
-                                    };
-                                    field.onChange(fileInfo);
+                                    field.onChange(asset);
                                 }
                                 setModalVisible(false);
                             }}
@@ -83,7 +75,7 @@ export default function RegisterFormUser() {
             />
 
             <Controller 
-                control={control}
+                control={controlUser}
                 name="nomeCompleto"
                 render={({field, fieldState}) => (
                     <CustomTextInput
@@ -98,7 +90,7 @@ export default function RegisterFormUser() {
             />
 
             <Controller 
-                control={control}
+                control={controlUser}
                 name="nomeCompletoSocial"
                 render={({field, fieldState}) => (
                     <CustomTextInput 
@@ -113,7 +105,7 @@ export default function RegisterFormUser() {
             />
 
             <Controller 
-                control={control}
+                control={controlUser}
                 name="cpf"
                 render={({field, fieldState}) => (
                     <CustomMaskedInput
@@ -130,7 +122,7 @@ export default function RegisterFormUser() {
             />
 
             <Controller 
-                control={control}
+                control={controlUser}
                 name="dataNascimento"
                 render={({field, fieldState}) => (
                     <CustomDatePicker
@@ -144,7 +136,7 @@ export default function RegisterFormUser() {
             />
 
             <Controller 
-                control={control}
+                control={controlUser}
                 name="sexo"
                 render={({field, fieldState}) => (
                     <CustomDropdown
@@ -159,7 +151,7 @@ export default function RegisterFormUser() {
             />
 
             <Controller 
-                control={control}
+                control={controlUser}
                 name="endereco.cep"
                 render={({field, fieldState}) => (
                     <CustomMaskedInput
@@ -172,12 +164,12 @@ export default function RegisterFormUser() {
                             if (extracted?.length === 8) 
                                 handleCepChange(extracted);
                             else if (extracted?.length === 0) {
-                                setValue("endereco.rua" ,'');
-                                setValue("endereco.bairro" ,'');
-                                setValue("endereco.cidade" ,'');
-                                setValue("endereco.uf" ,'');
+                                setUserValue("endereco.logradouro" ,'');
+                                setUserValue("endereco.bairro" ,'');
+                                setUserValue("endereco.cidade" ,'');
+                                setUserValue("endereco.uf" ,'');
                             }
-                            setValue("endereco.cep", extracted);
+                            setUserValue("endereco.cep", extracted);
                         }}
                         mask="99999-999"
                         error={fieldState.error?.message}
@@ -186,8 +178,8 @@ export default function RegisterFormUser() {
             />
 
             <Controller 
-                control={control}
-                name="endereco.rua"
+                control={controlUser}
+                name="endereco.logradouro"
                 render={({field, fieldState}) => (
                     <CustomTextInput
                         value={field.value}
@@ -202,7 +194,7 @@ export default function RegisterFormUser() {
             />
 
             <Controller 
-                control={control}
+                control={controlUser}
                 name="endereco.numero"
                 render={({field, fieldState}) => (
                     <CustomTextInput
@@ -217,7 +209,7 @@ export default function RegisterFormUser() {
             />
 
             <Controller 
-                control={control}
+                control={controlUser}
                 name="endereco.complemento"
                 render={({field, fieldState}) => (
                     <CustomTextInput
@@ -231,7 +223,7 @@ export default function RegisterFormUser() {
             />
 
             <Controller 
-                control={control}
+                control={controlUser}
                 name="endereco.bairro"
                 render={({field, fieldState}) => (
                     <CustomTextInput
@@ -247,7 +239,7 @@ export default function RegisterFormUser() {
             />
 
             <Controller 
-                control={control}
+                control={controlUser}
                 name="endereco.cidade"
                 render={({field, fieldState}) => (
                     <CustomTextInput
@@ -263,7 +255,7 @@ export default function RegisterFormUser() {
             />
 
             <Controller 
-                control={control}
+                control={controlUser}
                 name="endereco.uf"
                 render={({field, fieldState}) => (
                     <CustomTextInput
@@ -279,7 +271,7 @@ export default function RegisterFormUser() {
             />
 
             <Controller 
-                control={control}
+                control={controlUser}
                 name="telefone"
                 render={({field, fieldState}) => (
                     <CustomMaskedInput

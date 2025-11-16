@@ -1,12 +1,13 @@
 import React, { useState } from "react";
 import { Modal, Pressable, Text, useColorScheme, View } from "react-native"
 import { PhotoIcon, CameraIcon } from "react-native-heroicons/solid";
+import { RegisterUserPhotoFormData } from "@/schemas/registerUserSchema";
 import * as ImagePicker from 'expo-image-picker';
 
 type PhotoPickerProps = {
     visible: boolean;
     onClose: () => void;
-    onChange: (asset: ImagePicker.ImagePickerAsset) => void;
+    onChange: (arquivo: RegisterUserPhotoFormData | null) => void;
     value?: string;
     aspect?: [number, number];
 }
@@ -21,6 +22,18 @@ export default function PhotoPicker ({
     const colorScheme = useColorScheme();
     const iconsColor = colorScheme == 'dark' ? '#dbeafe':'#0f172a';
     
+    const normalizeAsset = (asset: ImagePicker.ImagePickerAsset) => {
+        const uri = asset.uri;
+        const name = (asset.fileName ?? uri.split('/').pop() ?? "photo.jpg");
+        const type = (asset.type ?? asset.mimeType ?? "image");
+        const tamanhoEmBytes = String((asset.fileSize ?? 0));
+        return {
+            uri,
+            type,
+            name
+        } as RegisterUserPhotoFormData;
+    }
+
     //Coletar foto de galeria
     const pickImage = async () => {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -34,6 +47,7 @@ export default function PhotoPicker ({
             allowsEditing: true,
             aspect: aspect,
             quality: 1,
+            base64: false
         });
 
         if(!result.canceled) {
