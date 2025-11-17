@@ -1,55 +1,63 @@
-import { buildUserPayload, RegisterUserFormData, RegisterUserPhotoFormData } from "@/schemas/registerUserSchema";
-import axios from "axios";
+import { buildUserPayload, RegisterUserFormData } from "@/schemas/registerUserSchema";
 
-function base64ToBlob(dataUri: string): Blob {
-  const [prefix, base64] = dataUri.split(',');
-  const mimeMatch = prefix.match(/:(.*?);/);
-  const mime = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
-  const byteCharacters = atob(base64);
-  const byteNumbers = new Array(byteCharacters.length);
-  for (let i = 0; i < byteCharacters.length; i++) {
-    byteNumbers[i] = byteCharacters.charCodeAt(i);
-  }
-  const byteArray = new Uint8Array(byteNumbers);
-  return new Blob([byteArray], { type: mime });
-}
+export const registerUser = async (data: RegisterUserFormData) => {
+  const { arquivo, ...userData } = data;
+  const userPayload = buildUserPayload(userData);
 
-export const postUsuario = async (
-  userData: RegisterUserFormData,
-  profilePhoto?: RegisterUserPhotoFormData
-): Promise<any> => {
-  const formData = new FormData();
+  const body = new FormData();
+  body.append("user_data", JSON.stringify(userPayload));
 
-  // Adiciona o JSON como Blob para backend desserializar
-  const jsonBlob = new Blob([JSON.stringify(userData)], { type: 'application/json' });
-  formData.append('user_data', jsonBlob);
+  if (arquivo?.caminho) {
+    const photoName = arquivo.bucketArquivo?.nome || "profile.jpg";
+    const mime = arquivo.mimeType || "image/jpeg";
 
-  if (profilePhoto) {
-
-    console.log("= = = = = = = = = = = = = = ATENÇÃO cmc ARQUIVO = = = = = = = = = = = = =");
-    console.log(profilePhoto);
-    console.log("= = = = = = = = = = = = = = ATENÇÃO fim ARQUIVO = = = = = = = = = = = = =");
-    
-    // Detecta se uri é base64 (data URI)
-    if (profilePhoto.uri.startsWith('data:')) {
-      const blob = base64ToBlob(profilePhoto.uri);
-      formData.append('profile_photo', blob, profilePhoto.name);
-    } else { 
-      // URI local normal, repassa direto
-      formData.append('profile_photo', {
-        uri: profilePhoto.uri,
-        type: profilePhoto.type,
-        name: profilePhoto.name,
-      } as any);
+    try {
+      const module = await import("../utils/fileToBlob");
+      const blob = await module.fileUriToBlob(arquivo.caminho, mime);
+      // Ensure blob has a type field (some polyfills may omit it)
+      try { if (!blob.type) (blob as any).type = mime; } catch {}
+      // Append the Blob object (runtime will populate Content-Type for the part)
+      body.append("profile_photo", blob as any, photoName);
+      // debug
+      // eslint-disable-next-line no-console
+      console.log('Attached profile_photo as Blob:', photoName, mime);
+    } catch (error) {
+      // If Blob creation fails (e.g. in Expo Go where native module isn't available),
+      // fallback to the RN-friendly file descriptor object { uri, name, type }.
+      // We cast to `any` to satisfy TypeScript/FormData typing in React Native.
+      // This keeps uploads working in environments without native Blob support.
+      // eslint-disable-next-line no-console
+      console.warn('Erro ao criar Blob, usando fallback {uri,name,type}:', error);
+      const filePart: any = {
+        uri: arquivo.caminho,
+        name: photoName,
+        type: mime,
+      };
+      body.append('profile_photo', filePart as any);
+      // debug
+      // eslint-disable-next-line no-console
+      console.log('Attached profile_photo as {uri,name,type}:', filePart);
     }
+  } else {
+    body.append("profile_photo", "");
   }
 
-  // Importante: NÃO definir manualmente 'Content-Type', deixe axios cuidar disso
+  try {
+    const response = await fetch(
+      "https://harppia-endpoints.onrender.com/v1/users/register",
+      {
+        method: "POST",
+        body,
+      }
+    );
 
-  const response = await axios.post(
-    'https://harppia-endpoints.onrender.com/v1/users/register',
-    formData,
-  );
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
 
-  return response.data;
+    return await response.json();
+  } catch (error) {
+    console.error("Erro ao registrar usuário:", error);
+    throw error;
+  }
 };
