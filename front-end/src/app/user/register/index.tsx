@@ -10,7 +10,7 @@ import RegisterFormEmail from "@/components/login&register/RegisterFormEmail";
 import { useFormContext } from "react-hook-form";
 import { RegisterUserFormData, RegisterUserPhotoFormData } from "@/schemas/registerUserSchema";
 import axios from 'axios';
-import { registerUserDry, registerUserDryAsBlob, registerUser } from '@/api/registerUser';
+import { registerOnlyUserAsBlob, registerOnlyUserAsAppJson, registerUserWithFileAsBlob } from '@/api/registerUser';
 
 export default function Register() {
   const colorScheme = useColorScheme();
@@ -75,22 +75,24 @@ export default function Register() {
         // Última etapa: Enviar para a API
         setIsLoading(true);
           try {
-            const formData = getValues();
+            const userFormData = getUserData();
+            const fileFormData = getPhotoData();
+
             let responseData: any;
 
             if (submitMode === 'multipart') {
-              responseData = await registerUser(formData);
+              responseData = await registerUserWithFileAsBlob(userFormData, fileFormData);
             } else if (submitMode === 'dry') {
-              responseData = await registerUserDry(formData);
+              responseData = await registerOnlyUserAsBlob(userFormData);
             } else {
-              responseData = await registerUserDryAsBlob(formData);
+              responseData = await registerOnlyUserAsAppJson(userFormData);
             }
 
             // Se a resposta for sucesso (status 2xx)
             console.log("Cadastro realizado com sucesso!", responseData);
           router.push({
             pathname: "/user",
-            params: { email: userData.email, telefone: userData.telefone, rota: "register" },
+            params: { email: responseData.email, telefone: responseData.telefone, rota: "register" },
           });
 
           // Limpa o formulário

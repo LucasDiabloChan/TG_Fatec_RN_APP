@@ -1,6 +1,3 @@
-// ...existing code...
-// nota: antes havia uma função buildUserPayload que não existe neste projeto;
-// vamos usar os valores do formulário diretamente e normalizá-los abaixo.
 import { RegisterUserFormData } from '@/schemas/registerUserSchema';
 import { fileUriToBlob } from '@/utils/fileToBlob';
 import * as FileSystem from 'expo-file-system';
@@ -24,10 +21,12 @@ const normalizeUserPayload = (obj: Record<string, any>): Record<string, any> => 
 };
 
 // Utility: send only user_data as JSON (no file, no Blob conversion)
-export const registerUserDry = async (data: RegisterUserFormData): Promise<any> => {
-  const { arquivo, ...userData } = data;
+export const registerOnlyUserAsBlob = async (data: RegisterUserFormData): Promise<any> => {
+  
+  const userData = { ...data}; // copia todas as propriedades
+  
   const userPayload = normalizeUserPayload(userData as Record<string, any>);
-  const json = JSON.stringify(userPayload);
+  const userDataJson= JSON.stringify(userPayload);
 
   // helper to base64 encode string in various runtimes
   const base64Encode = (s: string) => {
@@ -45,11 +44,17 @@ export const registerUserDry = async (data: RegisterUserFormData): Promise<any> 
     const fd = new FormData();
 
     if (typeof Blob === 'function') {
-      const blob = new Blob([json], { type: 'multipart/form-data' });
+      const blob = new Blob([userDataJson], { type: 'multipart/form-data' });
+
+      const jsonA = JSON.stringify(userPayload);
+
+      const userDataBlob = new Blob([userDataJson], { type: 'application/json' });
+
+
       fd.append('user_data', blob as any, 'user_data.json');
     } else {
       // fallback: data URI as file descriptor (React Native style)
-      const b64 = base64Encode(json);
+      const b64 = base64Encode(userDataJson);
       if (!b64) throw new Error('Base64 encode not available');
       const dataUri = `data:multipart/form-data;base64,${b64}`;
       fd.append('user_data', { uri: dataUri, name: 'user_data.json', type: 'multipart/form-data' } as any);
@@ -65,7 +70,7 @@ export const registerUserDry = async (data: RegisterUserFormData): Promise<any> 
     }
     return res.json();
   } catch (err) {
-    console.warn('Could not send multipart for user_data, falling back to JSON POST:', err);
+    console.warn('Could not send multipart for user_data, falling back to userDataJsonPOST:', err);
     // last-resort: send multipart/form-data (keeps previous behavior)
     const res = await fetch(UPLOAD_URL, {
       method: 'POST',
@@ -80,8 +85,8 @@ export const registerUserDry = async (data: RegisterUserFormData): Promise<any> 
   }
 };
 
-export const registerUser = async (data: RegisterUserFormData): Promise<any> => {
-  const { arquivo, ...userData } = data;
+export const registerUserWithFileAsBlob = async (data: RegisterUserFormData, arquivo: {uri: string, type?: string, name?: string}): Promise<any> => {
+  const userData  = { ...data };
   const userPayload = normalizeUserPayload(userData as Record<string, any>);
 
   // Helper para enviar FormData via fetch
@@ -95,16 +100,16 @@ export const registerUser = async (data: RegisterUserFormData): Promise<any> => 
   };
 
   // Sem arquivo -> enviar apenas user_data
-  if (!arquivo?.caminho) {
+  if (!arquivo?.uri) {
     const fd = new FormData();
     fd.append('user_data', JSON.stringify(userPayload));
     fd.append('profile_photo', '');
     return await sendFormData(fd);
   }
 
-  const fileUri = arquivo.caminho;
-  const mime = arquivo.mimeType || 'image/jpeg';
-  const filename = arquivo.bucketArquivo?.nome || fileUri.split('/').pop() || 'photo.jpg';
+  const fileUri = arquivo.uri;
+  const mime = arquivo.type || 'image/jpeg';
+  const filename = arquivo.name || 'photo.jpg';
 
   // 1) Tentar criar Blob (fileUriToBlob)
   try {
@@ -120,9 +125,13 @@ export const registerUser = async (data: RegisterUserFormData): Promise<any> => 
       }
 
       const fd = new FormData();
-      fd.append('user_data', JSON.stringify(userPayload));
-      // append com filename para forçar envio correto
+
+      const userDataJson = JSON.stringify(userPayload);
+      const userDataBlob = new Blob([userDataJson], { type: 'application/json' });
+
+      fd.append('user_data', userDataBlob, 'user_data.json');
       fd.append('profile_photo', blob as any, filename);
+
       return await sendFormData(fd);
     } else {
       throw new Error('Blob not usable in this runtime');
@@ -175,33 +184,42 @@ export const registerUser = async (data: RegisterUserFormData): Promise<any> => 
 };
 
 // Utility: send user_data as a Blob inside multipart/form-data (no image file)
-export const registerUserDryAsBlob = async (data: RegisterUserFormData): Promise<any> => {
-  const { arquivo, ...userData } = data;
+export const registerOnlyUserAsAppJson = async (data: RegisterUserFormData): Promise<any> => {
+  const userData = { ...data };
   const userPayload = normalizeUserPayload(userData as Record<string, any>);
-  const json = JSON.stringify(userPayload);
+  const userDataJson = JSON.stringify(userPayload);
+
+  console.log("typeof Blob === 'function': " + (typeof Blob === 'function') );
 
   try {
     if (typeof Blob === 'function') {
-      const blob = new Blob([json], { type: 'multipart/form-data' });
+
       const fd = new FormData();
+
       // append the JSON as a file-like blob so server receives proper Content-Type
-      fd.append('user_data', blob as any, 'user_data.json');
+      fd.append('user_data', userDataJson as any, 'user_data.json');
+      
       // append empty profile_photo to keep same multipart shape as full upload
-      fd.append('profile_photo', '');
+      // fd.append('profile_photo', '');
 
       const res = await fetch(UPLOAD_URL, { method: 'POST', body: fd });
+
       if (!res.ok) {
         const text = await res.text().catch(() => '');
         throw new Error(`HTTP error! status: ${res.status}; body: ${text}`);
       }
+
       return res.json();
     } else {
       console.warn('Blob not available in this runtime; falling back to JSON POST');
-      return await registerUserDry(data);
+      
+      
+      // comentado pra n dar erro de função recursiva infinita
+      // return await registerOnlyUserAsAppJson(data);
     }
   } catch (err) {
     console.warn('registerUserDryAsBlob failed, falling back to JSON POST:', err);
-    return await registerUserDry(data);
+    // comentado pra n dar erro de função recursiva infinita
+    // return await registerOnlyUserAsAppJson(data);
   }
 };
-// ...existing code...
